@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: ONEsite Single Sign On
-Plugin URI: http://www.onesite.com
+Plugin URI: http://developer.onesite.com/plugins
 Description: Allow your uses to be signed into your single sign on solution.
 Author: Mike Benshoof
 Version: 0.1
@@ -489,7 +489,7 @@ class OnesiteSSO
 		} else {
 
 			// Rewriting disabled, so set add some GET vars.
-			$redirect_url = site_url() . $_SERVER['REQUEST_URI'];
+			$redirect_url = self::cleanCurUrl();
 			$qs = 'ssoinit=1&org=' . base64_encode($_SERVER['REQUEST_URI']);
 
 			if ($_SERVER['QUERY_STRING'] != "") {
@@ -874,7 +874,7 @@ class OnesiteSSO
 		} else {
 
 			// Rewriting disabled, so set add some GET vars.
-			$redirect_url = site_url() . $_SERVER['REQUEST_URI'];
+			$redirect_url = self::cleanCurUrl();
 			$qs = 'ssoinit=1';
 
 			if (wp_get_referer()) {
@@ -1135,5 +1135,22 @@ WIDGET;
 		echo "	<div class=\"error\">
 					<p>$msg</p>
 				</div>";		
+	}
+	
+	/**
+	 * Handle the case where wordpress is installed in a subdirectory.
+	 *
+	 * @return string
+	 */
+	public static function cleanCurUrl()
+	{
+		$parts = parse_url(home_url());
+		return home_url(
+			str_replace(
+				$parts['path'],
+				"",
+				$_SERVER['REQUEST_URI']
+			)
+		);
 	}
 }
