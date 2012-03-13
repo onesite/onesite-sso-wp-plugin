@@ -366,6 +366,7 @@ class OnesiteSSO
 		}
 		
 		// Try to make an instance of the SDK and validate the key.
+		$_POST['onesitesso_devkey'] = trim($_POST['onesitesso_devkey']);
 		$sdk = new onesite_sdk($_POST['onesitesso_devkey']);
 		$sdk->enableDebugging(dirname(__FILE__) . "/logs");
 		$info = $sdk->getIntegrationInfo();
@@ -1012,6 +1013,27 @@ WIDGET;
 			$raw_rows = self::_fetchFullOptions();
 		}
 		echo $pre . implode("\n", $raw_rows) . $end;
+		
+		if (is_null($devkey) || $devkey == "") {
+			echo "<strong>or</strong><br />
+				  <div id=\"oneSsoSignup\" style=\"width: 500px\"></div>
+						<script type=\"text/javascript\">
+							if (typeof ONELOADER == 'undefined' || !ONELOADER) {
+								ONELOADER = new Array();
+								(function() {
+									var e = document.createElement('script'); e.type = 'text/javascript'; e.async = true;
+									e.src = 'http://images.onesite.com/resources/scripts/utils/widget.js?ver=1';
+									(document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(e);
+								}());
+							}
+							ONELOADER.push(function () {
+								ONESITE.Widget.load('oneSsoSignup', 'node/ssoSignup', {
+									one_widget_node   : 'onesite.com',
+									hidePricelist     : 1
+								});
+							});
+						</script>";
+		}
 	}
 
 	/**
@@ -1023,7 +1045,7 @@ WIDGET;
 	{		
 		return array(
 				"<tr valign=\"top\">
-					<th scope=\"row\">ONEsite Devkey: <a href=\"javascript:alert('Master devkey for all interaction with ONEsite.')\"><img src=\"/wp-admin/images/comment-grey-bubble.png\"></a></th>
+					<th scope=\"row\">Enter ONEsite Devkey: <a href=\"javascript:alert('Master devkey for all interaction with ONEsite.')\"><img src=\"/wp-admin/images/comment-grey-bubble.png\"></a></th>
 					<td><input name=\"onesitesso_devkey\" value=\"\" type=\"text\"></td>
 				</tr>",
 			);
