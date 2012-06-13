@@ -855,7 +855,7 @@ class OnesiteSSO
 		$networkDom = self::getOption('networkDomain');
 		$widgetDom = self::getOption('widgetDomain');
 
-		$path = "/wp-content/plugins/onesite-sso";
+		$path = site_url().'/wp-content/plugins/onesite-sso';
 		$callback_url = $path.'/connection.html';
 
 		$rewrite = new WP_Rewrite();
