@@ -695,11 +695,17 @@ class OnesiteSSO
 	protected function _notFoundRemotely($extAcct)
 	{
 		onesite_sdk::debugLog("WP-ID not found at ONEsite for {$this->_session->user->id}, so store it.");
+		
 		$local_user = get_user_by_email(trim($this->_session->user->email));
 
 		if ($local_user === false) {
-			
 			onesite_sdk::debugLog("Local user not found.");
+
+			$new_registrations = get_option('users_can_register');
+			if (!$new_registrations) {
+				onesite_sdk::debugLog("New user registrations disabled.");
+				return;
+			}
 			
 			// Find available username.
 			$new_name = false;
@@ -721,6 +727,8 @@ class OnesiteSSO
 			if (!$new_name) {
 				return;
 			}
+
+			onesite_sdk::debugLog("Creating a new local user.");
 			
 			// Create a user with a random password.
 			$random_password = wp_generate_password( 12, false );
@@ -730,7 +738,7 @@ class OnesiteSSO
 				$this->_session->user->email
 			);
 			
-			onesite_sdk::debugLog("Local user $new_name stored - $wp_uid is new UID.");
+			onesite_sdk::debugLog("Local user $new_name created - $wp_uid is new UID.");
 			
 		} else {
 			$wp_uid = $local_user->ID;
@@ -855,7 +863,7 @@ class OnesiteSSO
 		$networkDom = self::getOption('networkDomain');
 		$widgetDom = self::getOption('widgetDomain');
 
-		$path = "/wp-content/plugins/onesite-sso";
+		$path = site_url().'/wp-content/plugins/onesite-sso';
 		$callback_url = $path.'/connection.html';
 
 		$rewrite = new WP_Rewrite();
