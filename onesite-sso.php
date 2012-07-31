@@ -3,9 +3,9 @@
 Plugin Name: ONEsite Single Sign On
 Plugin URI: http://developer.onesite.com/plugins
 Description: Allow your uses to be signed into your single sign on solution.
-Author: Mike Benshoof
-Version: 0.1
-Author URI: http://team.onesite.com/mike
+Author: ONEsite
+Author URI: http://developer.onesite.com/plugins
+Version: 1.0
 License: GPL2
 
     Copyright 2012 ONEsite, Inc.
@@ -37,6 +37,7 @@ add_action('init', 'OnesiteSSO::init');
 /**
  * Handles all the authentication/login flows for ONEsite Single Sign On.
  *
+ * @author Derek Myers <dmyers@onesite.com>
  * @author Mike Benshoof <mbenshoof@onesite.com>
  */
 class OnesiteSSO
@@ -82,7 +83,6 @@ class OnesiteSSO
 	 * @var array
 	 */
 	public static $settings = array(
-		
 			"devkey" => array(
 					"type"  => "string",
 					"label" => "ONEsite Devkey",
@@ -208,8 +208,7 @@ class OnesiteSSO
 			$this->_sdk = new onesite_sdk($this->devkey);
 			
 			if ($this->debugging) {
-				
-				$path = dirname(__FILE__) . $this->debugDirectory;
+				$path = dirname(__FILE__) . '/' . $this->debugDirectory;
 				$this->_sdk->enableDebugging($path);				
 			}
 			
@@ -280,14 +279,12 @@ class OnesiteSSO
 
 		// See if we should change logic if we are on an init flow.
 		if ($this->_wpRewrite) {
-		
 			if (strpos($_SERVER['REQUEST_URI'], self::REDIR_BASE) === 0) {
 				$this->_onInitFlow = true;
 			} else {
 				$this->_onInitFlow = false;
 			}
 		} else {
-			
 			if (array_key_exists("ssoinit", $_GET) && $_GET['ssoinit'] == 1) {
 				$this->_onInitFlow = true;
 			} else {
@@ -305,12 +302,15 @@ class OnesiteSSO
 	 */
 	public static function init()
 	{
+		onesite_sdk::debugLog("Go through init.");
+
 		// By default, always add the admin panel.
 		add_action('admin_menu', 'OnesiteSSO::adminPanel');
 		
 		// Grab a new class and store an instance of it
 		$class = __CLASS__;
 		$sso = new $class();
+		
 		self::$instance = $sso;
 
 		// No devkey has been defined (or we don't have an SDK).
@@ -323,7 +323,6 @@ class OnesiteSSO
 		try {
 			$sso->validateMasterSession();
 		} catch (onesite_exception $e) {
-			
 			// Go through the redirect channels and start a session.
 			$sso->initMasterSession();
 			return;
@@ -379,7 +378,6 @@ class OnesiteSSO
 		
 		// Check to see if the user is logged in.
 		if(is_user_logged_in()) {
-			
 			global $current_user;
 			get_currentuserinfo();
 			
@@ -418,10 +416,8 @@ class OnesiteSSO
 	{
 		// We are on the init flow, so store the cookies and redirect.
 		if ($this->_onInitFlow) {
-			
 			// Keymaster redirect flow.
 			if (array_key_exists("oned", $_GET)) {
-				
 				$tmp_parts = explode(',', base64_decode($_GET['oned']));							
 				$parts = array();
 				foreach ($tmp_parts as $tmp_part) {
@@ -436,14 +432,11 @@ class OnesiteSSO
 				
 				$cu = $parts['core_u'];
 				$cx = $parts['core_x'];
-				
 			}
 			// Social login flow.
 			elseif (array_key_exists("core_u", $_GET)) {
-				
 				$cu = $_GET['core_u'];
 				$cx = $_GET['core_x'];
-				
 			} else {
 				onesite_sdk::debugLog("Missing a coreU on an itit flow entirely.");				
 				return;
@@ -458,6 +451,7 @@ class OnesiteSSO
 			} else {
 				$loc = "/";
 			}
+			
 			onesite_sdk::debugLog("Doing a redirect in validate session " . $loc);
 			wp_redirect($loc);
 			exit;
@@ -481,14 +475,14 @@ class OnesiteSSO
 	 */
 	public function initMasterSession()
 	{
+		onesite_sdk::debugLog("Go through master session.");
+
 		// Determine the rewrite logic.
 		if ($this->_wpRewrite) {
-		
 			// Rewriting enabled, so redirect to a clean URL.
 			$redirect_url = site_url(OnesiteSSO::REDIR_BASE);
 			$redirect_url .= '?org=' . base64_encode($_SERVER['REQUEST_URI']);
 		} else {
-
 			// Rewriting disabled, so set add some GET vars.
 			$redirect_url = self::cleanCurUrl();
 			$qs = 'ssoinit=1&org=' . base64_encode($_SERVER['REQUEST_URI']);
@@ -500,12 +494,16 @@ class OnesiteSSO
 			}			
 		}
 
+		onesite_sdk::debugLog("Redirect back to " . $redirect_url);
+		onesite_sdk::debugLog("Our network domain " . $this->networkDomain);
+
 		// Make the SDK call to get the appropriate redirect URL.
 		$loc = $this->_sessionApi->joinCrossDomain(
 			$redirect_url,
 			$this->networkDomain
 		);
 
+		onesite_sdk::debugLog("Doing a redirect in master session " . $loc);
 		wp_redirect($loc);
 		exit;
 	}
@@ -534,17 +532,23 @@ class OnesiteSSO
 		onesite_sdk::debugLog("Go through seamless flow");
 	
 		try {
-			
 			// Throws exception on invalid ONEsite login state.
 			global $current_user;
 			get_currentuserinfo();
 			
-			if ($current_user->ID != self::getOption("wpAdminId")) {			
+			onesite_sdk::debugLog("Current WP ID ({$current_user->ID}).");
+			
+			if (!self::getOption("wpAdminId") || $current_user->ID != self::getOption("wpAdminId")) {
+				onesite_sdk::debugLog("Go through non-setup flow.");
+				
 				// Not in setup flow - run normal session check.
 				$this->_sessionCheck();
 			} else {
+				onesite_sdk::debugLog("Go through setup flow.");
+
 				// Call a session check from the API.
 				$this->_sessionApi->check($this->_session);
+
 				$info = $this->_sdk->getIntegrationInfo();
 	
 				// No user at all - so bail at this point.
@@ -560,11 +564,15 @@ class OnesiteSSO
 					$this->_session->user->id = $info['admin_user_id'];
 				}				
 			}
+			
+			onesite_sdk::debugLog("Current Site ID ({$this->uniqueSiteID}).");
 
 			// Check for a linked wordpress account identifier.
 			$extAcct = $this->_sdk->newExternalAccount();
 			$extAcct->providerName = "wordpress-" . $this->uniqueSiteID;
+
 			$this->_userApi->getExternalAccount($this->_session->user, $extAcct);
+
 			$wp_uid = $extAcct->userIdentifier;
 
 			// Account is not linked - so handle that.
@@ -573,7 +581,6 @@ class OnesiteSSO
 			} else {
 				$this->_foundRemotely($wp_uid);
 			}
-
 		} catch (Exception $e) {
 			$this->_handleException($e);			
 		}
@@ -595,6 +602,8 @@ class OnesiteSSO
 		
 		onesite_sdk::debugLog("Initiating SDK logout");
 		$this->_sessionApi->logout($this->_session);
+
+		onesite_sdk::debugLog("Doing a redirect in logout " . home_url());
 		wp_redirect(home_url());
 		exit;
 	}
@@ -608,12 +617,13 @@ class OnesiteSSO
 	 */
 	protected function _sessionCheck()
 	{
+		onesite_sdk::debugLog("Go through session check");
+
 		// Call a session check from the API.
 		$this->_sessionApi->check($this->_session);
 		
 		// Is session no longer valid?
 		if (!$this->_session->isValid()) {
-			
 			throw new onesite_exception(
 					"Invalid ONEsite session detected.",
 					self::ONESITE_INVALID_SESSION
@@ -621,7 +631,6 @@ class OnesiteSSO
 		}
 		// Is user logged out on ONEsite but logged in locally?
 		else if ($this->_session->isAnonymous() && is_user_logged_in()) {
-			
 			throw new onesite_exception(
 					"Logged out at ONEsite, but logged in locally.",
 					self::ONESITE_LOGGED_OUT
@@ -640,11 +649,12 @@ class OnesiteSSO
 	 */
 	protected function _foundRemotely($wp_uid)
 	{
+		onesite_sdk::debugLog("WP-ID found at ONEsite for {$this->_session->user->id}, so log them in.");
+
 		$user_info = get_userdata($wp_uid);
 		
 		// Check to see if the user is logged in.
 		if(is_user_logged_in()) {
-			
 			onesite_sdk::debugLog("We have a logged in user - so validate");
 			
 			global $current_user;
@@ -655,27 +665,29 @@ class OnesiteSSO
 				onesite_sdk::debugLog("Valid user, so nothing to do.");
 				return;
 			} else {
-				
 				onesite_sdk::debugLog("We are logged in as the wrong user.");
+				onesite_sdk::debugLog("Logging in WP ID - {$user_info->user_login}.");
+
 				wp_set_auth_cookie($wp_uid, true, false);
 				do_action('wp_login', $user_info->user_login);
+
+				onesite_sdk::debugLog("Doing a redirect in found remote " . $_SERVER['REQUEST_URI']);
 				wp_redirect( $_SERVER['REQUEST_URI'] );
 				exit;				
 			}
 		} else {
-
 			// We found a matching ID, so log the user in.
 			if($user_info->ID == $wp_uid) {
-
 				onesite_sdk::debugLog("We are not logged in, but have a valid WP ID.");
+				onesite_sdk::debugLog("Logging in WP ID - {$user_info->user_login}.");
 
 				wp_set_auth_cookie($wp_uid, true, false);
 				do_action('wp_login', $user_info->user_login);
+
+				onesite_sdk::debugLog("Doing a redirect in found remote " . $_SERVER['REQUEST_URI']);
 				wp_redirect( $_SERVER['REQUEST_URI'] );
 				exit;
-
 			} else {
-				
 				onesite_sdk::debugLog("Log that we reached a very odd state for WP->ID {$wp_uid}.");
 				return;
 			}
@@ -695,15 +707,22 @@ class OnesiteSSO
 	protected function _notFoundRemotely($extAcct)
 	{
 		onesite_sdk::debugLog("WP-ID not found at ONEsite for {$this->_session->user->id}, so store it.");
+		
 		$local_user = get_user_by_email(trim($this->_session->user->email));
 
 		if ($local_user === false) {
-			
 			onesite_sdk::debugLog("Local user not found.");
+
+			$new_registrations = get_option('users_can_register');
+			if (!$new_registrations) {
+				onesite_sdk::debugLog("New user registrations disabled.");
+				return;
+			}
 			
 			// Find available username.
 			$new_name = false;
 			$loop = 0;
+			
 			while ($loop < 20) {
 				$tmp_name = $this->_session->user->username;
 				if ($loop > 0) {
@@ -718,9 +737,12 @@ class OnesiteSSO
 
 				$loop++;
 			}
+
 			if (!$new_name) {
 				return;
 			}
+
+			onesite_sdk::debugLog("Creating a new local user.");
 			
 			// Create a user with a random password.
 			$random_password = wp_generate_password( 12, false );
@@ -730,8 +752,7 @@ class OnesiteSSO
 				$this->_session->user->email
 			);
 			
-			onesite_sdk::debugLog("Local user $new_name stored - $wp_uid is new UID.");
-			
+			onesite_sdk::debugLog("Local user $new_name created - $wp_uid is new UID.");
 		} else {
 			$wp_uid = $local_user->ID;
 			$new_name = $local_user->user_login;
@@ -743,10 +764,14 @@ class OnesiteSSO
 				$this->_session->user,
 				$extAcct
 			);
+
+		onesite_sdk::debugLog("Logging in WP ID - $wp_uid.");
 		
 		// Log the user into wordpress.
 		wp_set_auth_cookie($wp_uid, true, false);
 		do_action('wp_login', $new_name);
+
+		onesite_sdk::debugLog("Doing a redirect in not found remote " . $_SERVER['REQUEST_URI']);
 		wp_redirect( $_SERVER['REQUEST_URI'] );
 		exit;
 	}
@@ -837,6 +862,8 @@ class OnesiteSSO
 		// Delete any ONEsite cookies.
 		$this->storeLocalCookie(ONESITE_AUTH_COOKIE, "", -3600);
 		$this->storeLocalCookie(ONESITE_SEC_COOKIE, "", -3600);
+
+		onesite_sdk::debugLog("Doing a redirect in handle exception " . $_SERVER['REQUEST_URI']);
 		wp_redirect( $_SERVER['REQUEST_URI'] );
 		exit;		
 	}
@@ -855,7 +882,7 @@ class OnesiteSSO
 		$networkDom = self::getOption('networkDomain');
 		$widgetDom = self::getOption('widgetDomain');
 
-		$path = "/wp-content/plugins/onesite-sso";
+		$path = site_url().'/wp-content/plugins/onesite-sso';
 		$callback_url = $path.'/connection.html';
 
 		$rewrite = new WP_Rewrite();
@@ -1075,30 +1102,13 @@ WIDGET;
 							<td>";
 						
 			switch ($details['type']) {
-				
 				case "bool":
-					
 					$val = (int)self::getOption($opt);
-					
-					if ($val === 0) {
-						$row .= "<input 
-									type=\"radio\" 
-									name=\"" . self::OPTION_PREFIX . "_" . $opt . "\"
-									value=\"0\" checked>No
-								 <input 
-									type=\"radio\" 
-									name=\"" . self::OPTION_PREFIX . "_" . $opt . "\"
-									value=\"1\">Yes";						
-					} else {
-						$row .= "<input 
-									type=\"radio\" 
-									name=\"" . self::OPTION_PREFIX . "_" . $opt . "\"
-									value=\"0\">No
-								 <input 
-									type=\"radio\" 
-									name=\"" . self::OPTION_PREFIX . "_" . $opt . "\"
-									value=\"1\" checked>Yes";							
-					}		
+
+					$row .= "<input 
+								type=\"checkbox\" 
+								name=\"" . self::OPTION_PREFIX . "_" . $opt . "\"
+								value=\"1\"".($val === 0 ? "" : "checked")." />";
 					break;
 				
 				case "string":
