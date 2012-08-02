@@ -1,7 +1,7 @@
 # ONEsite SSO Wordpress Plugin
 
 Contributors: onesitedev
-Tags: single sign on, SSO, registration, login
+Tags: single sign on, SSO, registration, login, social login
 Requires at least: 3.0
 Tested up to: 3.4.1
 Stable tag: 1.0
@@ -18,7 +18,7 @@ This plugin will override the default login and registration forms and provide a
 
 No additional software or hardware is required on your WordPress server.  However, the plugin does require a valid ONEsite devkey in order to link your WordPress installation to a ONEsite account.
 
-Request your free ONEsite devkey at (http://onesite.com/node/ssoSignup)
+Request your free ONEsite devkey at [http://onesite.com/node/ssoSignup](http://onesite.com/node/ssoSignup).
 
 ## Plugin Setup
 
@@ -28,9 +28,9 @@ Please ensure that your WordPress installation is fully completed before attempt
 
 The ONEsite Wordpress plugins are available from the following locations:
 
- * WordPress Plugin Library
- * [ONEsite Developer Portal] (http://developer.onesite.com/plugins)
- * [ONEsite @ GitHub] (https://github.com/onesite/onesite-sso-wordpress-plugin)
+ * [WordPress Plugin Library](http://profiles.wordpress.org/onesite/)
+ * [ONEsite Developer Portal](http://developer.onesite.com/plugins)
+ * [ONEsite @ GitHub](https://github.com/onesite/onesite-sso-wordpress-plugin)
  
 ### Download
 

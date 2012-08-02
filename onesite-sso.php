@@ -2,9 +2,9 @@
 /*
 Plugin Name: ONEsite Single Sign On
 Plugin URI: http://developer.onesite.com/plugins
-Description: Allow your uses to be signed into your single sign on solution.
+Description: Allows your users to be logged into your site using the ONESite single sign-on solution.
 Author: ONEsite
-Author URI: http://developer.onesite.com/plugins
+Author URI: http://onesite.com
 Version: 1.0
 License: GPL2
 
@@ -25,7 +25,7 @@ License: GPL2
 */
 
 // Include the SDK entry point.
-require_once(dirname(__FILE__) . "/onesite-php-sdk/src/com/onesite/sdk.php");
+require_once dirname(__FILE__) . "/onesite-php-sdk/src/com/onesite/sdk.php";
 
 // Define the ONEsite cookie values needed.
 define("ONESITE_AUTH_COOKIE", "core_u");
@@ -61,7 +61,7 @@ class OnesiteSSO
 	 *
 	 * @var string
 	 */
-	const REDIR_BASE = "/wp-content/plugins/onesite-sso/init";
+	const REDIR_BASE = "/wp-content/plugins/%s/init";
 
 	/**
 	 * Session status check is INVALID from ONEsite.
@@ -83,48 +83,42 @@ class OnesiteSSO
 	 * @var array
 	 */
 	public static $settings = array(
-			"devkey" => array(
-					"type"  => "string",
-					"label" => "ONEsite Devkey",
-					"desc"  => "Master devkey for all interaction with ONEsite.",
-				),
-
-			"networkDomain" => array(
-					"type"   => "string",
-					"label"  => "Master Domain",
-					"desc"   => "Master domain that will maintain SSO cookies.",
-				),
-			
-			"widgetDomain" => array(
-					"type"   => "string",
-					"label"  => "Widget Domain",
-					"desc"   => "Domain that houses the Social Login widget.",
-				),
-				
-			"widgetDevkey" => array(
-					"type"   => "string",
-					"label"  => "Widget Devkey",
-					"desc"   => "Devkey to include in the Social Login widget request.",
-				),
-
-			"uniqueSiteID" => array(
-					"type"   => "string",
-					"label"  => "Site ID",
-					"desc"   => "Unique Identifier for this site in ONEsite platform.",
-				),
-
-			"debugging" => array(
-					"type"   => "bool",
-					"label"  => "Enable Debugging",
-					"desc"   => "Enable the system debugger.",
-				),
-				
-			"debugDirectory" => array(
-					"type"   => "string",
-					"label"  => "Debugging Directory",
-					"desc"   => "The relative directory that will hold the debug logs.  Should be writable by web server.",
-				),	
-		);
+		"devkey" => array(
+			"type"  => "string",
+			"label" => "ONEsite Devkey",
+			"desc"  => "Master devkey for all interaction with ONEsite.",
+		),
+		"uniqueSiteID" => array(
+			"type"   => "string",
+			"label"  => "Site ID",
+			"desc"   => "Unique Identifier for this site in ONEsite platform.",
+		),
+		"networkDomain" => array(
+			"type"   => "string",
+			"label"  => "Master Domain",
+			"desc"   => "Master domain that will maintain SSO cookies.",
+		),
+		"widgetDomain" => array(
+			"type"   => "string",
+			"label"  => "Widget Domain",
+			"desc"   => "Domain that houses the Social Login widget.",
+		),
+		"widgetDevkey" => array(
+			"type"   => "string",
+			"label"  => "Widget Devkey",
+			"desc"   => "Devkey to include in the Social Login widget request.",
+		),
+		"debugging" => array(
+			"type"   => "bool",
+			"label"  => "Enable Debugging",
+			"desc"   => "Enable the system debugger.",
+		),
+		"debugDirectory" => array(
+			"type"   => "string",
+			"label"  => "Debugging Directory",
+			"desc"   => "The relative directory that will hold the debug logs.",
+		),
+	);
 	
 	/**
 	 * Singleton instance of the SSO object.
@@ -276,10 +270,13 @@ class OnesiteSSO
 
 		$rewrite = new WP_Rewrite();
 		$this->_wpRewrite = $rewrite->using_mod_rewrite_permalinks();
+		
+		$pluginDir = self::getPluginDir();
+		$redirBase = sprintf(self::REDIR_BASE, $pluginDir);
 
 		// See if we should change logic if we are on an init flow.
 		if ($this->_wpRewrite) {
-			if (strpos($_SERVER['REQUEST_URI'], self::REDIR_BASE) === 0) {
+			if (strpos($_SERVER['REQUEST_URI'], $redirBase) === 0) {
 				$this->_onInitFlow = true;
 			} else {
 				$this->_onInitFlow = false;
@@ -304,8 +301,11 @@ class OnesiteSSO
 	{
 		onesite_sdk::debugLog("Go through init.");
 
-		// By default, always add the admin panel.
+		// Add the admin panel.
 		add_action('admin_menu', 'OnesiteSSO::adminPanel');
+		
+		// Register settings.
+		add_action('admin_init', 'OnesiteSSO::registerSettings');
 		
 		// Grab a new class and store an instance of it
 		$class = __CLASS__;
@@ -476,11 +476,14 @@ class OnesiteSSO
 	public function initMasterSession()
 	{
 		onesite_sdk::debugLog("Go through master session.");
+		
+		$pluginDir = self::getPluginDir();
+		$redirBase = sprintf(self::REDIR_BASE, $pluginDir);
 
 		// Determine the rewrite logic.
 		if ($this->_wpRewrite) {
 			// Rewriting enabled, so redirect to a clean URL.
-			$redirect_url = site_url(OnesiteSSO::REDIR_BASE);
+			$redirect_url = site_url($redirBase);
 			$redirect_url .= '?org=' . base64_encode($_SERVER['REQUEST_URI']);
 		} else {
 			// Rewriting disabled, so set add some GET vars.
@@ -805,6 +808,16 @@ class OnesiteSSO
 			return null;
 		}
 	}
+	
+	/**
+	 * Returns the plugin's directory name.
+	 *
+	 * @return string
+	 */
+	public static function getPluginDir()
+	{
+		return dirname( plugin_basename( __FILE__ ) );
+	}
 
 	/**
 	 * A wrapper that adds the proper prefix, etc and fetches the option from
@@ -877,21 +890,25 @@ class OnesiteSSO
 	 * @return false
 	 */
 	public static function printSocialLogin()
-	{		
+	{
+		wp_enqueue_style( 'onesite_sso', plugins_url( 'style/style.css', __FILE__), array(), '1.0' );
+		
 		$devkey = self::getOption('widgetDevkey');
 		$networkDom = self::getOption('networkDomain');
 		$widgetDom = self::getOption('widgetDomain');
+		$pluginDir = self::getPluginDir();
 
-		$path = site_url().'/wp-content/plugins/onesite-sso';
-		$callback_url = $path.'/connection.html';
+		$path = site_url('/wp-content/plugins/' . $pluginDir);
+		$callback_url = $path . '/connection.html';
 
 		$rewrite = new WP_Rewrite();
+		$redirBase = sprintf(self::REDIR_BASE, $pluginDir);
 
 		// Determine the rewrite logic.
 		if ($rewrite->using_mod_rewrite_permalinks()) {
 		
 			// Rewriting enabled, so redirect to a clean URL.
-			$redirect_url = site_url(OnesiteSSO::REDIR_BASE);
+			$redirect_url = site_url($redirBase);
 						
 			if (wp_get_referer()) {
 				$redirect_url .= '?org=' . base64_encode(wp_get_referer());
@@ -920,7 +937,6 @@ class OnesiteSSO
 		$widget = <<<WIDGET
 <script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js'></script>
 <script type="text/javascript">
-
 		document.write(
 				'<script type="text/javascript" src="'
 				+ 'http://{$widgetDom}/js/socialLogin/display'
@@ -968,7 +984,6 @@ WIDGET;
 		echo "	<script type='text/javascript'>
 					$(function() {
 					 	// Handler for .ready() called.
-					 	document.getElementById('login').innerHTML = '';
 					 	oneSocialLogin.init();
 					});						
 				</script>";
@@ -982,13 +997,12 @@ WIDGET;
 	public static function adminPanel()
 	{
 		add_options_page(
-				'ONEsite SSO Configuration',
-				'ONEsite SSO',
-				'manage_options',
-				self::SETTINGS_NAMESPACE,
-				'OnesiteSSO::showOptions'
-			);
-		add_action('admin_init', 'OnesiteSSO::registerSettings');
+			'ONEsite SSO',
+			'ONEsite SSO',
+			'manage_options',
+			self::SETTINGS_NAMESPACE,
+			'OnesiteSSO::showOptions'
+		);
 	}
 
 	/**
@@ -1011,26 +1025,7 @@ WIDGET;
 	 */
 	public static function showOptions()
 	{
-		// Capture the output of the settings_fields nonce.	
-		ob_start();
-		settings_fields( self::SETTINGS_NAMESPACE );
-		$settings_fields = ob_get_clean();
-	
-		// Build the main table.
-		$pre = "<div class=\"wrap\">
-					<h2>" . translate('ONEsite SSO') . "</h2>
-					<form method=\"post\" action=\"options.php\">"
-						. $settings_fields .
-
-						"<table class=\"form-table\">";
-						
-		$end = "		</table>
-						<p class=\"submit\">
-						<input type=\"submit\" class=\"button-primary\" value=\"" . translate('Save Changes') ."\" />
-						</p>
-					</form>
-				</div>";
-		
+		wp_enqueue_style( 'onesite_sso_admin', plugins_url( 'style/style-admin.css', __FILE__), array(), '1.0' );
 		
 		$devkey = self::getOption("devkey");
 		
@@ -1039,7 +1034,27 @@ WIDGET;
 		} else {
 			$raw_rows = self::_fetchFullOptions();
 		}
-		echo $pre . implode("\n", $raw_rows) . $end;
+		?>
+		<div class="wrap">
+			<div class="onesite-logo"></div>
+			
+			<h2><?php echo translate('Single Sign-On'); ?></h2>
+			
+			<h3><?php echo translate('Settings'); ?></h3>
+			
+			<?php settings_errors(); ?>
+			
+			<form method="post" action="options.php">
+				<?php settings_fields( self::SETTINGS_NAMESPACE ); ?>
+
+				<table class="form-table">
+					<?php echo implode("\n", $raw_rows); ?>
+				</table>
+				
+				<?php submit_button(); ?>
+			</form>
+		</div>
+		<?php
 		
 		if (is_null($devkey) || $devkey == "") {
 			echo "<strong>or</strong><br />
@@ -1091,36 +1106,35 @@ WIDGET;
 		foreach (self::$settings as $opt => $details) {
 		
 			$row = "	<tr valign=\"top\">
-							<th scope=\"row\">" . translate($details['label']) . ": <a href=\"javascript:alert('" .
-							translate($details['desc']);
+							<th scope=\"row\"><label for=\"".$opt."\">" . translate($details['label']) . "</label>";
 			
 			if (array_key_exists("parent", $details)) {
 				$row .= " (Requires " . self::$settings[$details['parent']]['label'] . " to be enabled.)";
 			}			
 			
-			$row .=	 "')\"><img src=\"/wp-admin/images/comment-grey-bubble.png\"></a></th>
-							<td>";
+			$row .=	 "</th>
+							<td><input id=\"".$opt."\"
+										name=\"" . self::OPTION_PREFIX . "_" . $opt . "\"";
 						
 			switch ($details['type']) {
 				case "bool":
 					$val = (int)self::getOption($opt);
 
-					$row .= "<input 
-								type=\"checkbox\" 
-								name=\"" . self::OPTION_PREFIX . "_" . $opt . "\"
-								value=\"1\"".($val === 0 ? "" : "checked")." />";
+					$row .= "	type=\"checkbox\" 
+								value=\"1\"".($val === 0 ? "" : " checked")." />";
 					break;
 				
 				case "string":
 				case "int":
 				default:
 				
-					$row .= "<input 
-								type=\"text\" 
-								name=\"" . self::OPTION_PREFIX . "_" . $opt . "\" 
+					$row .= "	type=\"text\" 
+								class=\"regular-text\" 
 								value=\"" . self::getOption($opt) . "\" />";
 					break;
 			}
+			
+			$row .= "<p class=\"description\">" . translate($details['desc']) . '</p>';
 
 			$row .= 		"</td>
 						</tr>";

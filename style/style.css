@@ -1,0 +1,11 @@
+#login {
+	display: none;
+}
+
+#modalLoginBox.modalPage {
+	background: #FBFBFB;
+}
+
+#modalLoginBox .modalClose {
+	display: none;
+}
