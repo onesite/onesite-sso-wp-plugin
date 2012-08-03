@@ -170,11 +170,11 @@ class OnesiteSSO
 	protected $_cookieDomain;
 	
 	/**
-	 * Determines if we are on an itit flow.
+	 * Determines if we are on an init flow.
 	 *
 	 * @var boolean
 	 */
-	protected $_onInitFlow;
+	protected $_onInitFlow = false;
 	
 	/**
 	 * Do we have wordpress rewrites turned on.
@@ -278,14 +278,10 @@ class OnesiteSSO
 		if ($this->_wpRewrite) {
 			if (strpos($_SERVER['REQUEST_URI'], $redirBase) === 0) {
 				$this->_onInitFlow = true;
-			} else {
-				$this->_onInitFlow = false;
 			}
 		} else {
 			if (array_key_exists("ssoinit", $_GET) && $_GET['ssoinit'] == 1) {
 				$this->_onInitFlow = true;
-			} else {
-				$this->_onInitFlow = false;
 			}
 		}
 	}
@@ -325,11 +321,12 @@ class OnesiteSSO
 		} catch (onesite_exception $e) {
 			// Go through the redirect channels and start a session.
 			$sso->initMasterSession();
-			return;
 		}
 		
-		// Overtake the login form and capture logout.
+		// Overtake the login form.
 		add_action('login_head','OnesiteSSO::overwriteLoginPage');
+		
+		// Capture logout.
 		add_action('wp_logout', 'OnesiteSSO::handleLogout');
 		
 		// Handle the flow as needed.
@@ -353,8 +350,8 @@ class OnesiteSSO
 			return;
 		}		
 		
-		// Just hitting an admin page for the first time
-		if ($_POST['action'] != "update") {
+		// Just hitting an admin page for the first time.
+		if (isset($_POST['action']) && $_POST['action'] != "update") {
 			add_action('admin_notices', 'OnesiteSSO::adminDevkeyMissing');
 			return;
 		}
@@ -401,8 +398,6 @@ class OnesiteSSO
 			
 			self::setOption("wpAdminId", $current_user->ID);
 		}
-
-		return;
 	}
 	
 	/**
@@ -416,6 +411,8 @@ class OnesiteSSO
 	{
 		// We are on the init flow, so store the cookies and redirect.
 		if ($this->_onInitFlow) {
+			onesite_sdk::debugLog("Starting the session init flow.");
+			
 			// Keymaster redirect flow.
 			if (array_key_exists("oned", $_GET)) {
 				$tmp_parts = explode(',', base64_decode($_GET['oned']));							
@@ -606,8 +603,9 @@ class OnesiteSSO
 		onesite_sdk::debugLog("Initiating SDK logout");
 		$this->_sessionApi->logout($this->_session);
 
-		onesite_sdk::debugLog("Doing a redirect in logout " . home_url());
-		wp_redirect(home_url());
+		$redirect = home_url();
+		onesite_sdk::debugLog("Doing a redirect in logout " . $redirect);
+		wp_redirect($redirect);
 		exit;
 	}
 	
@@ -709,9 +707,14 @@ class OnesiteSSO
 	 */
 	protected function _notFoundRemotely($extAcct)
 	{
-		onesite_sdk::debugLog("WP-ID not found at ONEsite for {$this->_session->user->id}, so store it.");
+		if (!empty($this->_session->user->id)) {
+			onesite_sdk::debugLog("WP-ID not found at ONEsite for {$this->_session->user->id}, so store it.");
+		}
 		
-		$local_user = get_user_by_email(trim($this->_session->user->email));
+		$local_user = false;
+		if (!empty($this->_session->user->email)) {
+			$local_user = get_user_by_email(trim($this->_session->user->email));
+		}
 
 		if ($local_user === false) {
 			onesite_sdk::debugLog("Local user not found.");
@@ -858,7 +861,6 @@ class OnesiteSSO
 	protected function _handleException($e)
 	{
 		switch ($e->getCode()) {
-			
 			case self::ONESITE_INVALID_SESSION:
 			case self::ONESITE_LOGGED_OUT:
 				// Log them out locally if needed.
@@ -893,6 +895,8 @@ class OnesiteSSO
 	{
 		wp_enqueue_style( 'onesite_sso', plugins_url( 'style/style.css', __FILE__), array(), '1.0' );
 		
+		wp_enqueue_script( 'jquery' );
+		
 		$devkey = self::getOption('widgetDevkey');
 		$networkDom = self::getOption('networkDomain');
 		$widgetDom = self::getOption('widgetDomain');
@@ -906,7 +910,6 @@ class OnesiteSSO
 
 		// Determine the rewrite logic.
 		if ($rewrite->using_mod_rewrite_permalinks()) {
-		
 			// Rewriting enabled, so redirect to a clean URL.
 			$redirect_url = site_url($redirBase);
 						
@@ -915,9 +918,7 @@ class OnesiteSSO
 			} else {
 				$redirect_url .= '?';
 			}
-			
 		} else {
-
 			// Rewriting disabled, so set add some GET vars.
 			$redirect_url = self::cleanCurUrl();
 			$qs = 'ssoinit=1';
@@ -932,61 +933,64 @@ class OnesiteSSO
 				$redirect_url .= "?$qs";
 			}			
 		}
-
-
-		$widget = <<<WIDGET
-<script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js'></script>
+		?>
 <script type="text/javascript">
-		document.write(
-				'<script type="text/javascript" src="'
-				+ 'http://{$widgetDom}/js/socialLogin/display'
-				+ '?one_widget_node={$networkDom}'
-				+ '&devkey={$devkey}'
-				+ '&callback_url={$callback_url}'
-				+ '&load_profile=true'
-				+ '&js_callback=onesitesso_callback'
-				+ '&view=modal'
-				+ '"><' + '/script>'
-		);
+	document.write(
+		'<script type="text/javascript" src="'
+		+ 'http://<?php echo $widgetDom ?>/js/socialLogin/display'
+		+ '?one_widget_node=<?php echo $networkDom ?>'
+		+ '&devkey=<?php echo $devkey ?>'
+		+ '&callback_url=<?php echo $callback_url ?>'
+		+ '&load_profile=true'
+		+ '&js_callback=onesitesso_callback'
+		+ '&view=modal'
+		+ '"><' + '/script>'
+	);
 
-		function onesitesso_callback(action, args) {
-				switch (action) {
-						case 'loaded':
-						case 'error':
-								return false;
-				}
-
-				var redirect_url = '{$redirect_url}';
-				for (x in args) {
-						redirect_url += '&' + x + '=' + encodeURIComponent(args[x]);
-				}
-
-				window.location.assign(redirect_url);
+	function onesitesso_callback(action, args) {
+		switch (action) {
+			case 'loaded':
+			case 'error':
 				return false;
 		}
 
-</script>
-WIDGET;
+		var redirect_url = '<?php echo $redirect_url ?>';
+		for (x in args) {
+			redirect_url += '&' + x + '=' + encodeURIComponent(args[x]);
+		}
 
-		echo $widget;
+		window.location.assign(redirect_url);
+		return false;
+	}
+</script>
+		<?php
 	}
 
 	/**
 	 * Strip out the native login form and replace with social login.
-	 * When the dom is ready, automatically display the modal
+	 * When the dom is ready, automatically display the modal.
 	 *
 	 * @return void
 	 */
 	public static function overwriteLoginPage()
 	{
-		self::printSocialLogin();
+		if (is_user_logged_in()) {
+			$redirect = home_url();
+			onesite_sdk::debugLog("User is already logged in.");
+			onesite_sdk::debugLog("Doing a redirect in login " . $redirect);
+			wp_redirect($redirect);
+			exit;
+		}
 		
-		echo "	<script type='text/javascript'>
-					$(function() {
-					 	// Handler for .ready() called.
-					 	oneSocialLogin.init();
-					});						
-				</script>";
+		self::printSocialLogin();
+		?>
+<script type="text/javascript">
+jQuery(function() {
+	// Handler for .ready() called.
+	oneSocialLogin.init();
+});						
+</script>
+		<?php
 	}
 
 	/**
@@ -1058,23 +1062,23 @@ WIDGET;
 		
 		if (is_null($devkey) || $devkey == "") {
 			echo "<strong>or</strong><br />
-				  <div id=\"oneSsoSignup\" style=\"width: 500px\"></div>
-						<script type=\"text/javascript\">
-							if (typeof ONELOADER == 'undefined' || !ONELOADER) {
-								ONELOADER = new Array();
-								(function() {
-									var e = document.createElement('script'); e.type = 'text/javascript'; e.async = true;
-									e.src = 'http://images.onesite.com/resources/scripts/utils/widget.js?ver=1';
-									(document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(e);
-								}());
-							}
-							ONELOADER.push(function () {
-								ONESITE.Widget.load('oneSsoSignup', 'node/ssoSignup', {
-									one_widget_node   : 'onesite.com',
-									hidePricelist     : 1
-								});
-							});
-						</script>";
+				<div id=\"oneSsoSignup\" style=\"width: 500px\"></div>
+				<script type=\"text/javascript\">
+					if (typeof ONELOADER == 'undefined' || !ONELOADER) {
+						ONELOADER = new Array();
+						(function() {
+							var e = document.createElement('script'); e.type = 'text/javascript'; e.async = true;
+							e.src = 'http://images.onesite.com/resources/scripts/utils/widget.js?ver=1';
+							(document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(e);
+						}());
+					}
+					ONELOADER.push(function () {
+						ONESITE.Widget.load('oneSsoSignup', 'node/ssoSignup', {
+							one_widget_node   : 'onesite.com',
+							hidePricelist     : 1
+						});
+					});
+				</script>";
 		}
 	}
 
@@ -1086,11 +1090,14 @@ WIDGET;
 	protected static function _fetchSetupOptions()
 	{		
 		return array(
-				"<tr valign=\"top\">
-					<th scope=\"row\">Enter ONEsite Devkey: <a href=\"javascript:alert('Master devkey for all interaction with ONEsite.')\"><img src=\"/wp-admin/images/comment-grey-bubble.png\"></a></th>
-					<td><input name=\"onesitesso_devkey\" value=\"\" type=\"text\"></td>
-				</tr>",
-			);
+			"<tr valign=\"top\">
+				<th scope=\"row\"><label for=\"onesitesso_devkey\">Enter ONEsite Devkey</label></th>
+				<td>
+					<input type=\"text\" name=\"onesitesso_devkey\" id=\"onesitesso_devkey\" />
+					<p class=\"description\">Master devkey for all interaction with ONEsite.</p>
+				</td>
+			</tr>",
+		);
 	}
 	
 	/**
@@ -1104,7 +1111,6 @@ WIDGET;
 	
 		// Build all the rows based on the settings fields above.
 		foreach (self::$settings as $opt => $details) {
-		
 			$row = "	<tr valign=\"top\">
 							<th scope=\"row\"><label for=\"".$opt."\">" . translate($details['label']) . "</label>";
 			
@@ -1123,11 +1129,9 @@ WIDGET;
 					$row .= "	type=\"checkbox\" 
 								value=\"1\"".($val === 0 ? "" : " checked")." />";
 					break;
-				
 				case "string":
 				case "int":
 				default:
-				
 					$row .= "	type=\"text\" 
 								class=\"regular-text\" 
 								value=\"" . self::getOption($opt) . "\" />";
@@ -1152,16 +1156,12 @@ WIDGET;
 	 */
 	public static function adminDevkeyMissing()
 	{
-		ob_start();
-		printf( 
+		$msg = sprintf(
 			__( 'ONEsite SSO plugin almost ready to configure. To start using ONEsite SSO <strong>you need to set your ONEsite SDK Devkey</strong>. You can do that in the <a href="%1s">ONEsite SSO settings page</a>.', 'wpsc' ),
 			admin_url( 'options-general.php?page=' . self::SETTINGS_NAMESPACE ) 
 		);
-		$msg = ob_get_clean();
 		
-		echo "	<div class=\"error\">
-					<p>$msg</p>
-				</div>";		
+		self::displayError($msg);
 	}
 	
 	/**
@@ -1171,16 +1171,26 @@ WIDGET;
 	 */
 	public static function adminDevkeyWrong()
 	{
-		ob_start();
-		printf( 
+		$msg = sprintf(
 			__( '<strong>Invalid ONEsite SDK Devkey detected.</strong>. Please update the devkey in the <a href="%1s">ONEsite SSO settings page</a>.', 'wpsc' ),
 			admin_url( 'options-general.php?page=' . self::SETTINGS_NAMESPACE ) 
 		);
-		$msg = ob_get_clean();
 		
-		echo "	<div class=\"error\">
-					<p>$msg</p>
-				</div>";		
+		self::displayError($msg);
+	}
+	
+	/**
+	 * Alert the user with a custom message.
+	 *
+	 * @return void
+	 */
+	public static function displayError($msg)
+	{
+		?>
+		<div class="error">
+			<p><?php echo $msg ?></p>
+		</div>
+		<?php
 	}
 	
 	/**
