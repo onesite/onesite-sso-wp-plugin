@@ -1001,8 +1001,8 @@ jQuery(function() {
 	public static function adminPanel()
 	{
 		add_options_page(
-			'ONEsite SSO',
-			'ONEsite SSO',
+			__('ONEsite SSO', 'onesite'),
+			__('ONEsite SSO', 'onesite'),
 			'manage_options',
 			self::SETTINGS_NAMESPACE,
 			'OnesiteSSO::showOptions'
@@ -1042,9 +1042,9 @@ jQuery(function() {
 		<div class="wrap">
 			<div class="onesite-logo"></div>
 			
-			<h2><?php echo translate('Single Sign-On'); ?></h2>
+			<h2><?php echo __('Single Sign-On', 'onesite'); ?></h2>
 			
-			<h3><?php echo translate('Settings'); ?></h3>
+			<h3><?php echo __('Settings', 'onesite'); ?></h3>
 			
 			<?php settings_errors(); ?>
 			
@@ -1112,7 +1112,7 @@ jQuery(function() {
 		// Build all the rows based on the settings fields above.
 		foreach (self::$settings as $opt => $details) {
 			$row = "	<tr valign=\"top\">
-							<th scope=\"row\"><label for=\"".$opt."\">" . translate($details['label']) . "</label>";
+							<th scope=\"row\"><label for=\"".$opt."\">" . __($details['label'], 'onesite') . "</label>";
 			
 			if (array_key_exists("parent", $details)) {
 				$row .= " (Requires " . self::$settings[$details['parent']]['label'] . " to be enabled.)";
@@ -1138,7 +1138,7 @@ jQuery(function() {
 					break;
 			}
 			
-			$row .= "<p class=\"description\">" . translate($details['desc']) . '</p>';
+			$row .= "<p class=\"description\">" . __($details['desc'], 'onesite') . '</p>';
 
 			$row .= 		"</td>
 						</tr>";
@@ -1157,7 +1157,7 @@ jQuery(function() {
 	public static function adminDevkeyMissing()
 	{
 		$msg = sprintf(
-			__( 'ONEsite SSO plugin almost ready to configure. To start using ONEsite SSO <strong>you need to set your ONEsite SDK Devkey</strong>. You can do that in the <a href="%1s">ONEsite SSO settings page</a>.', 'wpsc' ),
+			__( 'ONEsite SSO plugin almost ready to configure. To start using ONEsite SSO <strong>you need to set your ONEsite SDK Devkey</strong>. You can do that in the <a href="%1s">ONEsite SSO settings page</a>.', 'onesite' ),
 			admin_url( 'options-general.php?page=' . self::SETTINGS_NAMESPACE ) 
 		);
 		
@@ -1172,7 +1172,7 @@ jQuery(function() {
 	public static function adminDevkeyWrong()
 	{
 		$msg = sprintf(
-			__( '<strong>Invalid ONEsite SDK Devkey detected.</strong>. Please update the devkey in the <a href="%1s">ONEsite SSO settings page</a>.', 'wpsc' ),
+			__( '<strong>Invalid ONEsite SDK Devkey detected.</strong>. Please update the devkey in the <a href="%1s">ONEsite SSO settings page</a>.', 'onesite' ),
 			admin_url( 'options-general.php?page=' . self::SETTINGS_NAMESPACE ) 
 		);
 		
