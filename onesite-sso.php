@@ -1000,7 +1000,7 @@ jQuery(function() {
 	 */
 	public static function adminPanel()
 	{
-		add_options_page(
+		add_menu_page(
 			__('ONEsite SSO', 'onesite'),
 			__('ONEsite SSO', 'onesite'),
 			'manage_options',
