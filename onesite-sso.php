@@ -25,7 +25,7 @@ License: GPL2
 */
 
 // Include the SDK entry point.
-require_once dirname(__FILE__) . "/onesite-php-sdk/src/com/onesite/sdk.php";
+require_once dirname(__FILE__) . '/includes/onesite-php-sdk/src/com/onesite/sdk.php';
 
 // Define the ONEsite cookie values needed.
 define("ONESITE_AUTH_COOKIE", "core_u");
